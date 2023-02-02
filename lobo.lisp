@@ -25,10 +25,10 @@
                     (aref array (1- i)))
         finally (return array)))
 	
-
-(defun deal-from-deck (n deck hand)
-  (dotimes (i n)
-    (push (pop deck) hand)))
+;;; pop and push do not work as I expected, so I need to make this a macro. If I use defun, the arguments are not modified.
+(defmacro deal-from-deck (n deck hand)
+  `(dotimes (i ,n)
+    (push (pop ,deck) ,hand)))
 
 (defun card-val (card)
   (first card))
@@ -51,6 +51,6 @@
 	(lobo-hand nil)
 	(your-hand nil))
     (setf deck (shuffle deck))
-    (deal-from-deck (4 deck lobo-hand))
-    (deal-from-deck (4 deck your-hand))
-    (print-status)))
+    (deal-from-deck 4 deck lobo-hand)
+    (deal-from-deck 4 deck your-hand)
+    (print-status lobo-hand your-hand deck)))
