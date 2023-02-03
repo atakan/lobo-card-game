@@ -2,10 +2,10 @@
   ((lobo-hand :initform nil)
    (your-hand :initform nil)
    (deck :initarg :init-deck)
-   (discard :initarg nil)
-   (top-card-revealed :initarg nil)
-   (lobo-score :initarg 0)
-   (your-score :initarg 0))
+   (discard :initform nil)
+   (top-card-revealed :initform nil)
+   (lobo-score :initform 0)
+   (your-score :initform 0))
   (:documentation "This keeps track of the status of the game. The first four are card collections, the fifth is a boolean variable, next two are integers."))
 
 
