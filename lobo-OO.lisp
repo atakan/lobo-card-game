@@ -60,7 +60,7 @@
 ;      (push (pop (deck g)) hand))
 ;    (setf (tc-revealed g) nil)))
 
-;;; pop and push do not work as I expected, so I need to make this a macro. If I use defun, the arguments are not modified.
+;;; pop and push do not work as I expected, so I need to make this a macro. If I use defun, the arguments are not modified. Maybe it would work if I make it a method.
 (defmacro deal-from-deck (n deck hand)
   `(dotimes (i ,n)
      (push (pop ,deck) ,hand)))
@@ -81,6 +81,39 @@
     (deal-to-hand my-game 'lobo 4)
     (deal-to-hand my-game 'you 4)
     (print-status my-game)))
+
+(defun lobo-help ()
+  (format t "
+ You need to enter a command as a lisp list:
+ (<com> (<your-hand>) (<lobo-hand>))
+ here, <com> is the command (see options below), <your-hand> or <lobo-hand> is a list of indices indicating the cards to be used from your hand or the wolf's hand, respectively. They are 1-indexed, e.g., (1 3) indicates the first and the third card.
+ Your options for command are:
+   m ('match'): Take a card from your hand and the matching card from the wolf's hand. You receive the top card.
+   s ('sum'): Take several of your cards from your hand to add up to one of wolf's cards. You receive the top card.
+   w ('sweep'): A single card from your hand matches the sum of several card's from the wolf's hand. The wolf receives the top card.
+   o ('over'): A single card from your hand is greater than a single card from the wolf's hand. The wolf receives cards in number equal to difference of the two cards.
+   f ('fold'): The round ends. The wolf receives points equal to sum of the cards in its hand.
+
+  The round will also end if as a result of a command either hand is down to zero cards.")) 
+
+(defun fold ()
+  (format t "you folded~%"))
+
+(defun match (your-cards lobo-cards)
+  (format t "this is match.~%")
+  (format t "your cards: ~a, lobo-cards: ~a" your-cards lobo-cards))
+
+(defun lobo-prompt (lobo-game)
+  (format t "[m]atch, [s]um, s[w]eep, [o]ver or [f]old.~%")
+  (format t "Enter a lisp list for a command: ")
+  (let ((command nil))
+    (setf command (read *standard-input*))
+    (case (first command)
+      (m (match (second command) (third command)))
+      (f (fold))
+      (t (lobo-help))))
+  (lobo-prompt))
+       
 
 ;(defun card-val (card)
 ;  (first card))
