@@ -1,22 +1,24 @@
+;;; convention: "lobo" refers to the game, "wolf" refers to the imaginary opponent in the game.
+
 (defclass lobo-game ()
-  ((lobo-hand :initform nil :accessor l-hand)
+  ((wolf-hand :initform nil :accessor w-hand)
    (your-hand :initform nil :accessor y-hand)
    (deck :initarg :init-deck :accessor deck)
    (discard :initform nil :accessor discard)
    (top-card-revealed :initform nil :accessor tc-revealed)
-   (lobo-score :initform 0 :accessor l-score)
+   (wolf-score :initform 0 :accessor w-score)
    (your-score :initform 0 :accessor y-score))
   (:documentation "This keeps track of the status of the game. The first four are card collections, the fifth is a boolean variable, next two are integers."))
 
 (defun make-lobo-deck (&key (difficulty "hard"))
   "This is a deck with 5 suits and numbers from 1 to 8 (easy) or 9 (normal) or 10 (hard). Suits are actually irrelevant, but we'll keep them to make a GUI easier in the future.
   I should probably define a struct or class for cards at some point."
-  (let ((nmax (cond ((equal difficulty "hard") 10)
+  (let ((nmax (cond ((equal difficulty "hard") 10) ; case uses eql, so i use cond
 		    ((equal difficulty "normal") 9)
 		    ((equal difficulty "easy") 8))))
     (loop for n from 1 to nmax
 	  append (loop for s in (list "a" "b" "c" "d" "e")
-		       collect (list n s))))
+		       collect (list n s)))))
 
 (defun shuffle (sequence)
   "This takes a list and returns a shuffled list.
@@ -42,8 +44,8 @@
   (:documentation "Prints the status of a Lobo game. This includes hands, scores, the top card of deck and number of card in the deck and the discard."))
 
 (defmethod print-status ((g lobo-game))
-  (format t "~&LOBO (~a): " (l-score g))
-  (format t "~s" (l-hand g))
+  (format t "~&WOLF (~a): " (w-score g))
+  (format t "~s" (w-hand g))
   (format t "~&YOU (~a): " (y-score g))
   (format t "~s" (y-hand g))
   (format t "~&Top Card: ~a" (first (deck g)))
@@ -51,39 +53,22 @@
   (format t " (~a cards left in deck," (length (deck g)))
   (format t " ~a cards in discard.)" (length (discard g))))
 
-(defgeneric deal-to-hand (lobo-game player n)
-  (:documentation "Deals n cards to the player (lobo or you)."))
-
-;(defmethod deal-to-hand ((g lobo-game) player n)
-;  (let ((hand nil))
-;    (ecase player
-;      (lobo (setf hand (l-hand g)))
-;      (you (setf hand (y-hand g))))
-;    (dotimes (i n)
-;      (push (pop (deck g)) hand))
-;    (setf (tc-revealed g) nil)))
-
 ;;; pop and push do not work as I expected, so I need to make this a macro. If I use defun, the arguments are not modified. Maybe it would work if I make it a method.
-(defmacro deal-from-deck (n deck hand)
+(defmacro move-cards (n &key from to)
   `(dotimes (i ,n)
-     (push (pop ,deck) ,hand)))
+     (push (pop ,from) ,to)))
 
-;(defun deal-from-deck (n deck hand)
-;  (dotimes (i n)
-;    (push (pop deck) hand)))
-
-(defmethod deal-to-hand ((g lobo-game) player n)
-  (ecase player
-    (lobo (deal-from-deck 4 (deck g) (l-hand g)))
-    (you (deal-from-deck 4 (deck g) (y-hand g)))))
+;;; XXX this should check if there are enough cards left in the deck, and if not shuffle the discard and put it at the bottom of deck before dealing cards.
+(defmethod deal-new-hands ((g lobo-game))
+  (move-cards 4 :from (deck g) :to (y-hand g))
+  (move-cards 4 :from (deck g) :to (w-hand g)))
 
 (defun simple-game ()
-  (let ((my-game (make-instance 'lobo-game
-				:init-deck (shuffle (make-lobo-deck)))))
-    (print-status my-game)
-    (deal-to-hand my-game 'lobo 4)
-    (deal-to-hand my-game 'you 4)
-    (print-status my-game)))
+  (let ((g (make-instance 'lobo-game
+			  :init-deck (shuffle (make-lobo-deck)))))
+    (print-status g)
+    (deal-new-hands g)
+    (lobo-prompt g)))
 
 (defun lobo-help ()
   (format t "
@@ -99,28 +84,58 @@
 
   The round will also end if as a result of a command either hand is down to zero cards.")) 
 
-(defun fold ()
-  (format t "you folded~%"))
+(defmethod game-mess ((g lobo-game) mess)
+  (format t mess))
 
-(defun match (your-cards lobo-cards)
+(defun card-val (card)
+  (first card))
+
+(defun sum-hand (hand) ; note: hand is a simple list for this implementation
+  (apply '+ (mapcar 'card-val hand)))
+
+(defmethod fold ((g lobo-game) cards)
+  (if (or (first cards) (second cards))
+      (game-mess g "You need to fold with two nils.")
+      (progn
+	(game-mess g "You folded.")
+	(setf (w-score g) (+ (w-score g) (sum-hand (w-hand g)))) ; incr w's score
+	(move-cards (length (y-hand g)) :from (y-hand g) :to (discard g))
+	(move-cards (length (w-hand g)) :from (w-hand g) :to (discard g))
+	(if (tc-revealed g) (move-cards 1 :from (deck g) :to (discard g)))
+	(deal-new-hands g))))
+    
+(defmethod match ((g lobo-game) cards)
   (format t "this is match.~%")
-  (format t "your cards: ~a, lobo-cards: ~a" your-cards lobo-cards))
+  (format t "your cards: ~a, wolf's cards: ~a" (first cards) (second cards)))
 
-(defun lobo-prompt (lobo-game)
-  (format t "[m]atch, [s]um, s[w]eep, [o]ver or [f]old.~%")
+(defmethod sum ((g lobo-game) cards)
+  (format t "this is sum.~%")
+  (format t "your cards: ~a, wolf's cards: ~a" (first cards) (second cards)))
+
+(defmethod sweep ((g lobo-game) cards)
+  (format t "this is sweep.~%")
+  (format t "your cards: ~a, wolf's cards: ~a" (first cards) (second cards)))
+
+(defmethod over ((g lobo-game) cards)
+  (format t "this is over.~%")
+  (format t "your cards: ~a, wolf's cards: ~a" (first cards) (second cards)))
+
+(defmethod lobo-prompt ((g lobo-game))
+  (print-status g)
+  (format t "~&[m]atch, [s]um, s[w]eep, [o]ver or [f]old.~%")
   (format t "Enter a lisp list for a command: ")
-  (let ((command nil))
-    (setf command (read *standard-input*))
-    (case (first command)
-      (m (match (second command) (third command)))
-      (f (fold))
-      (t (lobo-help))))
-  (lobo-prompt))
+  (let ((command (read *standard-input*)))
+    (if (not (equal 3 (length command))) ;try to guarantee something acceptable
+	(lobo-help)
+	(case (first command)
+	  (m (match g (rest command)))
+	  (s (sum   g (rest command)))
+	  (w (sweep g (rest command)))
+	  (o (over  g (rest command)))
+	  (f (fold  g (rest command)))
+	  (t (lobo-help))))
+    (lobo-prompt g)))
        
-
-;(defun card-val (card)
-;  (first card))
-
 ;(defun print-hand (hand)
 ;  (dolist (card hand)
 ;    (format t "~a " (card-val card)))
