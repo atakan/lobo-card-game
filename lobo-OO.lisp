@@ -8,12 +8,15 @@
    (your-score :initform 0 :accessor y-score))
   (:documentation "This keeps track of the status of the game. The first four are card collections, the fifth is a boolean variable, next two are integers."))
 
-(defun make-lobo-deck ()
-  "This is a deck with 5 suits and numbers from 1 to 10. Suits are actually irrelevant, but we'll keep them to make a GUI easier in the future.
-  I should probably define a struct for cards at some point."
-  (loop for n from 1 to 10
-	append (loop for s in (list "a" "b" "c" "d" "e")
-		     collect (list n s))))
+(defun make-lobo-deck (&key (difficulty "hard"))
+  "This is a deck with 5 suits and numbers from 1 to 8 (easy) or 9 (normal) or 10 (hard). Suits are actually irrelevant, but we'll keep them to make a GUI easier in the future.
+  I should probably define a struct or class for cards at some point."
+  (let ((nmax (cond ((equal difficulty "hard") 10)
+		    ((equal difficulty "normal") 9)
+		    ((equal difficulty "easy") 8))))
+    (loop for n from 1 to nmax
+	  append (loop for s in (list "a" "b" "c" "d" "e")
+		       collect (list n s))))
 
 (defun shuffle (sequence)
   "This takes a list and returns a shuffled list.
