@@ -68,7 +68,7 @@
 			  :init-deck (shuffle (make-lobo-deck)))))
     (print-status g)
     (deal-new-hands g)
-    (lobo-prompt g)))
+    (game-loop g)))
 
 (defun lobo-help ()
   (format t "
@@ -120,21 +120,25 @@
   (format t "this is over.~%")
   (format t "your cards: ~a, wolf's cards: ~a" (first cards) (second cards)))
 
-(defmethod lobo-prompt ((g lobo-game))
-  (print-status g)
-  (format t "~&[m]atch, [s]um, s[w]eep, [o]ver or [f]old.~%")
-  (format t "Enter a lisp list for a command: ")
-  (let ((command (read *standard-input*)))
-    (if (not (equal 3 (length command))) ;try to guarantee something acceptable
-	(lobo-help)
-	(case (first command)
-	  (m (match g (rest command)))
-	  (s (sum   g (rest command)))
-	  (w (sweep g (rest command)))
-	  (o (over  g (rest command)))
-	  (f (fold  g (rest command)))
-	  (t (lobo-help))))
-    (lobo-prompt g)))
+(defmethod game-loop ((g lobo-game))
+  (loop
+    (print-status g)
+    (format t "~&[m]atch, [s]um, s[w]eep, [o]ver, [f]old or [q]uit.~%")
+    (format t "Enter a lisp list for a command: ")
+    (let ((command (read *standard-input*)))
+      (if (not (equal 3 (length command))) ;try to guarantee something acceptable
+	  (lobo-help)
+	  (case (first command)
+	    (m (match g (rest command)))
+	    (s (sum   g (rest command)))
+	    (w (sweep g (rest command)))
+	    (o (over  g (rest command)))
+	    (f (fold  g (rest command)))
+	    (q (return 'quit))
+	    (t (lobo-help))))))
+  ;; do game checks here; 1. end the round if one of the hands is empty
+  ;; 2. end the game if the final score is reached.
+  )
        
 ;(defun print-hand (hand)
 ;  (dolist (card hand)
