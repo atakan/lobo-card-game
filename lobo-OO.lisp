@@ -105,6 +105,15 @@
 	(deal-new-hands g))))
     
 (defmethod match ((g lobo-game) cards)
+  (let ((y-cards (first cards))
+	(w-cards (second cards)))
+    ;; ensure that there is one card in each card list
+    (if (or (not (= 1 (length y-cards))) (not (= 1 (length w-cards))))
+	(format t "for match, you need to indicate one card in each hand")
+	;; ensure that the cards match
+	(if
+  ;; remove the indicated cards
+  ;; deal next card to the player (this turns off top-card-revealed)
   (format t "this is match.~%")
   (format t "your cards: ~a, wolf's cards: ~a" (first cards) (second cards)))
 
