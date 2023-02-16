@@ -44,7 +44,7 @@
   (:documentation "Prints the status of a Lobo game. This includes hands, scores, the top card of deck and number of card in the deck and the discard."))
 
 (defmethod print-status ((g lobo-game))
-  (format t "~&WOLF (~a): " (w-score g))
+  (format t "~&~%WOLF (~a): " (w-score g))
   (format t "~s" (w-hand g))
   (format t "~&YOU (~a): " (y-score g))
   (format t "~s" (y-hand g))
@@ -107,15 +107,24 @@
 (defmethod match ((g lobo-game) cards)
   (let ((y-cards (first cards))
 	(w-cards (second cards)))
-    ;; ensure that there is one card in each card list
-    (if (or (not (= 1 (length y-cards))) (not (= 1 (length w-cards))))
+    ;; ensure that there is one index in each card list
+    ;(if (or (not (= 1 (length y-cards))) (not (= 1 (length w-cards))))
+    (if (not (and (= 1 (length y-cards)) (= 1 (length w-cards))))
 	(format t "for match, you need to indicate one card in each hand")
 	;; ensure that the cards match
-	(if
-  ;; remove the indicated cards
-  ;; deal next card to the player (this turns off top-card-revealed)
-  (format t "this is match.~%")
-  (format t "your cards: ~a, wolf's cards: ~a" (first cards) (second cards)))
+	(if (not (equal (card-val (elt (y-hand g) (car y-cards)))
+			(card-val (elt (w-hand g) (car w-cards)))))
+	    (format t "the cards you indicate do not match")
+	    (progn
+	      (format t "you matched successfully!")
+	      ;; update score
+	      (incf (y-score g) (card-val (elt (y-hand g) (car y-cards))))
+	      ;; remove the indicated cards
+	      (setf (y-hand g) (remove-nth (car y-cards) (y-hand g)))
+	      (setf (w-hand g) (remove-nth (car w-cards) (w-hand g)))
+	      ;; deal next card to the player (this turns off top-card-revealed)
+	      (move-cards 1 :from (deck g) :to (y-hand g))
+	      (setf (tc-revealed g) nil))))))
 
 (defmethod sum ((g lobo-game) cards)
   (format t "this is sum.~%")
@@ -154,3 +163,11 @@
 ;    (format t "~a " (card-val card)))
 ;  (format t "~&"))
 
+
+;;; A utility function that can potentially be useful elsewhere
+(defun remove-nth (n lst)
+  (if (= n 0)
+      (cdr lst)
+      (if (> n (length lst))
+	  ((lambda (x) x) lst) ; I don't know how to simply return the list
+	  (cons (car lst) (remove-nth (1- n) (cdr lst))))))
