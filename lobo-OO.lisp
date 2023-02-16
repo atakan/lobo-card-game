@@ -166,6 +166,7 @@
 
 ;;; A utility function that can potentially be useful elsewhere
 (defun remove-nth (n lst)
+  "Remove nth element from a given list (0 indexed)."
   (if (= n 0)
       (cdr lst)
       (if (> n (length lst))
