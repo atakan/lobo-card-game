@@ -112,14 +112,14 @@
     ;; ensure that there is one index in each card list
     ;(if (or (not (= 1 (length y-cards))) (not (= 1 (length w-cards))))
     (unless (and (= 1 (length y-cards)) (= 1 (length w-cards)))
-      (format t "for match, you need to indicate one card in each hand")
+      (game-mess g "for match, you need to indicate one card in each hand")
       (return-from match))
     ;; ensure that the cards match
     (unless (equal (card-val (elt (y-hand g) (car y-cards)))
 		   (card-val (elt (w-hand g) (car w-cards))))
-      (format t "the cards you indicate do not match")
+      (game-mess g "the cards you indicate do not match")
       (return-from match))
-    (format t "you matched successfully!")
+    (game-mess g "you matched successfully!")
     ;; remove the indicated cards
     (setf (y-hand g) (remove-cards g y-cards (y-hand g)))
     (setf (w-hand g) (remove-cards g w-cards (w-hand g)))
@@ -137,14 +137,14 @@
 	(w-cards (second cards)))
     ;; ensure that there is one index in wolf's hand and several in your hand
     (unless (and (> (length y-cards) 1) (= (length w-cards) 1))
-      (format t "for sum, you need to indicate one card in wolf's and several in yours")
+      (game-mess "for sum, you need to indicate one card in wolf's and several in yours")
       (return-from sum))
     ;; ensure that the cards match
     (unless (equal (card-val-sum (y-hand g) y-cards)
 		   (card-val-sum (w-hand g) w-cards))
-      (format t "the cards you indicate do not sum up to each other")
+      (game-mess g "the cards you indicate do not sum up to each other")
       (return-from sum))
-    (format t "you summed successfully!")
+    (game-mess g "you summed successfully!")
     ;; remove the indicated cards
     (setf (y-hand g) (remove-cards g y-cards (y-hand g)))
     (setf (w-hand g) (remove-cards g w-cards (w-hand g)))
@@ -157,14 +157,14 @@
 	(w-cards (second cards)))
     ;; ensure that there is one index in your hand and several in wolf's
     (unless (and (= (length y-cards) 1) (> (length w-cards) 1))
-      (format t "for sweep, you need to indicate one card in your hand and several in wolf's")
+      (game-mess g "for sweep, you need to indicate one card in your hand and several in wolf's")
       (return-from sweep))
     ;; ensure that the cards match
     (unless (equal (card-val-sum (y-hand g) y-cards)
 		   (card-val-sum (w-hand g) w-cards))
-      (format t "the cards you indicate do not sum up to each other")
+      (game-mess g "the cards you indicate do not sum up to each other")
       (return-from sweep))
-    (format t "you swept successfully!")
+    (game-mess g "you swept successfully!")
     ;; remove the indicated cards
     (setf (y-hand g) (remove-cards g y-cards (y-hand g)))
     (setf (w-hand g) (remove-cards g w-cards (w-hand g)))
@@ -177,14 +177,14 @@
 	(w-cards (second cards)))
     ;; ensure that there is one index for both your hand and wolf's
     (unless (and (= (length y-cards) 1) (= (length w-cards) 1))
-      (format t "for sweep, you need to indicate one card in both your hand and wolf's")
+      (game-mess g "for sweep, you need to indicate one card in both your hand and wolf's")
       (return-from over))
     ;; ensure that your card is larger
     (unless (> (card-val-sum (y-hand g) y-cards)
 	       (card-val-sum (w-hand g) w-cards))
-      (format t "the card for your hand is not larger than the card for wolf's")
+      (game-mess g "the card for your hand is not larger than the card for wolf's")
       (return-from over))
-    (format t "you went over successfully!")
+    (game-mess g "you went over successfully!")
     (let ((val-diff (- (card-val-sum (y-hand g) y-cards)
 		       (card-val-sum (w-hand g) w-cards))))
       ;; remove the indicated cards
@@ -197,8 +197,8 @@
 (defmethod game-loop ((g lobo-game))
   (loop
     (print-status g)
-    (format t "~&[m]atch, [s]um, s[w]eep, [o]ver, [f]old or [q]uit.~%")
-    (format t "Enter a lisp list for a command: ")
+    (game-mess g "~&[m]atch, [s]um, s[w]eep, [o]ver, [f]old or [q]uit.~%")
+    (game-mess g "Enter a lisp list for a command: ")
     (let ((command (read *standard-input*)))
       (if (or (not (listp command)) (not (equal 3 (length command)))) ;try to guarantee something acceptable
 	  (lobo-help)
@@ -212,16 +212,16 @@
 	    (t (lobo-help)))))
     ;; do game checks here;
     ;; 1. end the round if one of the hands is empty,
-    (unless (y-hand g)
-      (format t "you won the round")
+    (when (equal (w-hand g) nil)
+      (game-mess g "you won the round")
       ;; 1b. update score,
       (incf (y-score g) (sum-hand (y-hand g)))
       ;; 1c. discard non-empty hand(and top card if revealed) and deal new hands.
       (move-cards (length (y-hand g)) :from (y-hand g) :to (discard g))
       (if (tc-revealed g) (move-cards 1 :from (deck g) :to (discard g)))
       (deal-new-hands g))
-    (unless (w-hand g)
-      (format t "wolf won the round")
+    (when (equal (y-hand g) nil)
+      (game-mess g "wolf won the round")
       ;; 1b. update score,
       (incf (w-score g) (sum-hand (w-hand g)))
       ;; 1c. discard non-empty hand(and top card if revealed) and deal new hands.
