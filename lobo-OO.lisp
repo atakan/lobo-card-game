@@ -118,26 +118,79 @@
       (format t "the cards you indicate do not match")
       (return-from match))
     (format t "you matched successfully!")
-    ;; update score XXX error: you do not update score here!
-    ;; (incf (y-score g) (card-val (elt (y-hand g) (car y-cards))))
     ;; remove the indicated cards
-    (setf (y-hand g) (remove-nth (car y-cards) (y-hand g)))
-    (setf (w-hand g) (remove-nth (car w-cards) (w-hand g)))
+    (setf (y-hand g) (remove-ele y-cards (y-hand g)))
+    (setf (w-hand g) (remove-ele w-cards (w-hand g)))
     ;; deal next card to the player (this turns off top-card-revealed)
     (move-cards 1 :from (deck g) :to (y-hand g))
     (setf (tc-revealed g) nil)))
 
+(defun card-val-sum (hand indices)
+  "Given a hand and a list of indices, calculates and returns the sum of card values"
+  (loop for i in indices
+	sum (card-val (elt hand i))))
+
 (defmethod sum ((g lobo-game) cards)
-  (format t "this is sum.~%")
-  (format t "your cards: ~a, wolf's cards: ~a" (first cards) (second cards)))
+  (let ((y-cards (first cards))
+	(w-cards (second cards)))
+    ;; ensure that there is one index in wolf's hand and several in your hand
+    (unless (and (> (length y-cards) 1) (= (length w-cards) 1))
+      (format t "for sum, you need to indicate one card in wolf's and several in yours")
+      (return-from sum))
+    ;; ensure that the cards match
+    (unless (equal (card-val-sum (y-hand g) y-cards)
+		   (card-val-sum (w-hand g) w-cards))
+      (format t "the cards you indicate do not sum up to each other")
+      (return-from sum))
+    (format t "you summed successfully!")
+    ;; remove the indicated cards
+    (setf (y-hand g) (remove-ele y-cards (y-hand g)))
+    (setf (w-hand g) (remove-ele w-cards (w-hand g)))
+    ;; deal next card to the player (this turns off top-card-revealed)
+    (move-cards 1 :from (deck g) :to (y-hand g))
+    (setf (tc-revealed g) nil)))
 
 (defmethod sweep ((g lobo-game) cards)
-  (format t "this is sweep.~%")
-  (format t "your cards: ~a, wolf's cards: ~a" (first cards) (second cards)))
+  (let ((y-cards (first cards))
+	(w-cards (second cards)))
+    ;; ensure that there is one index in your hand and several in wolf's
+    (unless (and (= (length y-cards) 1) (> (length w-cards) 1))
+      (format t "for sweep, you need to indicate one card in your hand and several in wolf's")
+      (return-from sweep))
+    ;; ensure that the cards match
+    (unless (equal (card-val-sum (y-hand g) y-cards)
+		   (card-val-sum (w-hand g) w-cards))
+      (format t "the cards you indicate do not sum up to each other")
+      (return-from sweep))
+    (format t "you swept successfully!")
+    ;; remove the indicated cards
+    (setf (y-hand g) (remove-ele y-cards (y-hand g)))
+    (setf (w-hand g) (remove-ele w-cards (w-hand g)))
+    ;; deal next card to the wolf (this turns off top-card-revealed)
+    (move-cards 1 :from (deck g) :to (w-hand g))
+    (setf (tc-revealed g) nil)))
 
 (defmethod over ((g lobo-game) cards)
-  (format t "this is over.~%")
-  (format t "your cards: ~a, wolf's cards: ~a" (first cards) (second cards)))
+  (let ((y-cards (first cards))
+	(w-cards (second cards)))
+    ;; ensure that there is one index for both your hand and wolf's
+    (unless (and (= (length y-cards) 1) (= (length w-cards) 1))
+      (format t "for sweep, you need to indicate one card in both your hand and wolf's")
+      (return-from over))
+    ;; ensure that your card is larger
+    (unless (> (card-val-sum (y-hand g) y-cards)
+	       (card-val-sum (w-hand g) w-cards))
+      (format t "the card for your hand is not larger than the card for wolf's")
+      (return-from over))
+    (format t "you went over successfully!")
+    (let ((val-diff (- (card-val-sum (y-hand g) y-cards)
+		       (card-val-sum (w-hand g) w-cards))))
+      ;; remove the indicated cards
+      (setf (y-hand g) (remove-ele y-cards (y-hand g)))
+      (setf (w-hand g) (remove-ele w-cards (w-hand g)))
+      ;; deal bunch of cards to the wolf (this turns off top-card-revealed)
+      (move-cards val-diff :from (deck g) :to (w-hand g))
+      (setf (tc-revealed g) nil))))
 
 (defmethod game-loop ((g lobo-game))
   (loop
@@ -145,7 +198,7 @@
     (format t "~&[m]atch, [s]um, s[w]eep, [o]ver, [f]old or [q]uit.~%")
     (format t "Enter a lisp list for a command: ")
     (let ((command (read *standard-input*)))
-      (if (not (equal 3 (length command))) ;try to guarantee something acceptable
+      (if (or (not (listp command)) (not (equal 3 (length command)))) ;try to guarantee something acceptable
 	  (lobo-help)
 	  (case (first command)
 	    (m (match g (rest command)))
@@ -168,6 +221,27 @@
       (if (> n (length lst))
 	  ((lambda (x) x) lst) ; I don't know how to simply return the list
 	  (cons (car lst) (remove-nth (1- n) (cdr lst))))))
+
+(defun remove-ele (indices lst)
+  "Given an index (as an atom) or a list of indices (as a list) remove all those from the given list (0 indexed) and return the result."
+  (if (atom indices)
+      (setf (elt lst indices) nil)
+      (dolist (i indices)
+	(setf (elt lst i) nil)))
+  (remove nil lst))
+
+(defmethod remove-cards ((g lobo-game) indices hand)
+  ;;"Given an index (as an atom) or a list of indices (as a list) move all those from the given hand into the discard. Use 0-index."
+  (if (atom indices)
+      (let ((tmp (elt hand indices)))
+	(push tmp (discard g))
+	(setf (elt hand indices) nil))
+      (dolist (i indices)
+	(let ((tmp (elt hand i)))
+	  (push tmp (discard g))
+	  (setf (elt hand i) nil))))
+  (remove nil hand))
+
 
 ;;; A hand class, let's see where this goes
 
