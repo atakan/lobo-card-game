@@ -7,7 +7,8 @@
    (discard :initform nil :accessor discard)
    (top-card-revealed :initform nil :accessor tc-revealed)
    (wolf-score :initform 0 :accessor w-score)
-   (your-score :initform 0 :accessor y-score))
+   (your-score :initform 0 :accessor y-score)
+   (max-score :initform 100 :accessor max-score))
   (:documentation "This keeps track of the status of the game. The first four are card collections, the fifth is a boolean variable, next two are integers."))
 
 (defun make-lobo-deck (&key (difficulty "hard"))
@@ -98,8 +99,9 @@
       (game-mess g "You need to fold with two nils.")
       (progn
 	(game-mess g "You folded.")
-	(setf (w-score g) (+ (w-score g) (sum-hand (w-hand g)))) ; incr w's score
 	(move-cards (length (y-hand g)) :from (y-hand g) :to (discard g))
+	;; XXX change this, discarding and returning should be enough XXX
+	(setf (w-score g) (+ (w-score g) (sum-hand (w-hand g)))) ; incr w's score
 	(move-cards (length (w-hand g)) :from (w-hand g) :to (discard g))
 	(if (tc-revealed g) (move-cards 1 :from (deck g) :to (discard g)))
 	(deal-new-hands g))))
@@ -119,8 +121,8 @@
       (return-from match))
     (format t "you matched successfully!")
     ;; remove the indicated cards
-    (setf (y-hand g) (remove-ele y-cards (y-hand g)))
-    (setf (w-hand g) (remove-ele w-cards (w-hand g)))
+    (setf (y-hand g) (remove-cards g y-cards (y-hand g)))
+    (setf (w-hand g) (remove-cards g w-cards (w-hand g)))
     ;; deal next card to the player (this turns off top-card-revealed)
     (move-cards 1 :from (deck g) :to (y-hand g))
     (setf (tc-revealed g) nil)))
@@ -144,8 +146,8 @@
       (return-from sum))
     (format t "you summed successfully!")
     ;; remove the indicated cards
-    (setf (y-hand g) (remove-ele y-cards (y-hand g)))
-    (setf (w-hand g) (remove-ele w-cards (w-hand g)))
+    (setf (y-hand g) (remove-cards g y-cards (y-hand g)))
+    (setf (w-hand g) (remove-cards g w-cards (w-hand g)))
     ;; deal next card to the player (this turns off top-card-revealed)
     (move-cards 1 :from (deck g) :to (y-hand g))
     (setf (tc-revealed g) nil)))
@@ -164,8 +166,8 @@
       (return-from sweep))
     (format t "you swept successfully!")
     ;; remove the indicated cards
-    (setf (y-hand g) (remove-ele y-cards (y-hand g)))
-    (setf (w-hand g) (remove-ele w-cards (w-hand g)))
+    (setf (y-hand g) (remove-cards g y-cards (y-hand g)))
+    (setf (w-hand g) (remove-cards g w-cards (w-hand g)))
     ;; deal next card to the wolf (this turns off top-card-revealed)
     (move-cards 1 :from (deck g) :to (w-hand g))
     (setf (tc-revealed g) nil)))
@@ -186,8 +188,8 @@
     (let ((val-diff (- (card-val-sum (y-hand g) y-cards)
 		       (card-val-sum (w-hand g) w-cards))))
       ;; remove the indicated cards
-      (setf (y-hand g) (remove-ele y-cards (y-hand g)))
-      (setf (w-hand g) (remove-ele w-cards (w-hand g)))
+      (setf (y-hand g) (remove-cards g y-cards (y-hand g)))
+      (setf (w-hand g) (remove-cards g w-cards (w-hand g)))
       ;; deal bunch of cards to the wolf (this turns off top-card-revealed)
       (move-cards val-diff :from (deck g) :to (w-hand g))
       (setf (tc-revealed g) nil))))
@@ -207,10 +209,32 @@
 	    (o (over  g (rest command)))
 	    (f (fold  g (rest command)))
 	    (q (return 'quit))
-	    (t (lobo-help))))))
-  ;; do game checks here; 1. end the round if one of the hands is empty
-  ;; 2. end the game if the final score is reached.
-  )
+	    (t (lobo-help)))))
+    ;; do game checks here;
+    ;; 1. end the round if one of the hands is empty,
+    (unless (y-hand g)
+      (format t "you won the round")
+      ;; 1b. update score,
+      (incf (y-score g) (sum-hand (y-hand g)))
+      ;; 1c. discard non-empty hand(and top card if revealed) and deal new hands.
+      (move-cards (length (y-hand g)) :from (y-hand g) :to (discard g))
+      (if (tc-revealed g) (move-cards 1 :from (deck g) :to (discard g)))
+      (deal-new-hands g))
+    (unless (w-hand g)
+      (format t "wolf won the round")
+      ;; 1b. update score,
+      (incf (w-score g) (sum-hand (w-hand g)))
+      ;; 1c. discard non-empty hand(and top card if revealed) and deal new hands.
+      (move-cards (length (w-hand g)) :from (w-hand g) :to (discard g))
+      (if (tc-revealed g) (move-cards 1 :from (deck g) :to (discard g)))
+      (deal-new-hands g))
+    ;; 2. end the game if the final score is reached.
+    (if (or (> (w-score g) (max-score g))
+	    (> (y-score g) (max-score g)))
+	(return 'quit)
+      ;; 2b. shuffle discard and add to bottom of deck if not.
+	(progn
+	  (format t "shuffle etc. (TBD)")))))
        
 
 ;;; A utility function that can potentially be useful elsewhere
