@@ -109,22 +109,23 @@
 	(w-cards (second cards)))
     ;; ensure that there is one index in each card list
     ;(if (or (not (= 1 (length y-cards))) (not (= 1 (length w-cards))))
-    (if (not (and (= 1 (length y-cards)) (= 1 (length w-cards))))
-	(format t "for match, you need to indicate one card in each hand")
-	;; ensure that the cards match
-	(if (not (equal (card-val (elt (y-hand g) (car y-cards)))
-			(card-val (elt (w-hand g) (car w-cards)))))
-	    (format t "the cards you indicate do not match")
-	    (progn
-	      (format t "you matched successfully!")
-	      ;; update score
-	      (incf (y-score g) (card-val (elt (y-hand g) (car y-cards))))
-	      ;; remove the indicated cards
-	      (setf (y-hand g) (remove-nth (car y-cards) (y-hand g)))
-	      (setf (w-hand g) (remove-nth (car w-cards) (w-hand g)))
-	      ;; deal next card to the player (this turns off top-card-revealed)
-	      (move-cards 1 :from (deck g) :to (y-hand g))
-	      (setf (tc-revealed g) nil))))))
+    (unless (and (= 1 (length y-cards)) (= 1 (length w-cards)))
+      (format t "for match, you need to indicate one card in each hand")
+      (return-from match))
+    ;; ensure that the cards match
+    (unless (equal (card-val (elt (y-hand g) (car y-cards)))
+		   (card-val (elt (w-hand g) (car w-cards))))
+      (format t "the cards you indicate do not match")
+      (return-from match))
+    (format t "you matched successfully!")
+    ;; update score XXX error: you do not update score here!
+    ;; (incf (y-score g) (card-val (elt (y-hand g) (car y-cards))))
+    ;; remove the indicated cards
+    (setf (y-hand g) (remove-nth (car y-cards) (y-hand g)))
+    (setf (w-hand g) (remove-nth (car w-cards) (w-hand g)))
+    ;; deal next card to the player (this turns off top-card-revealed)
+    (move-cards 1 :from (deck g) :to (y-hand g))
+    (setf (tc-revealed g) nil)))
 
 (defmethod sum ((g lobo-game) cards)
   (format t "this is sum.~%")
@@ -158,11 +159,6 @@
   ;; 2. end the game if the final score is reached.
   )
        
-;(defun print-hand (hand)
-;  (dolist (card hand)
-;    (format t "~a " (card-val card)))
-;  (format t "~&"))
-
 
 ;;; A utility function that can potentially be useful elsewhere
 (defun remove-nth (n lst)
@@ -172,3 +168,24 @@
       (if (> n (length lst))
 	  ((lambda (x) x) lst) ; I don't know how to simply return the list
 	  (cons (car lst) (remove-nth (1- n) (cdr lst))))))
+
+;;; A hand class, let's see where this goes
+
+(defclass card-collection ()
+  ((cards :initform nil :accessor cards))
+  (:documentation "A collection of cards. This can be the deck, the discard pile or the hands."))
+
+(defclass hand (card-collection)
+  ()
+  (:documentation "This is a sub-class of card collection. It refers to either your hand or wolf's hand."))
+
+(defgeneric deal-to-hand (lobo-game to &optional from)
+  ) ; if from is not given, it is dealt from the deck
+
+;(defgeneric deal-cards (card-collection card-collection)
+;  ) ;this will replace the pop/push macro above
+  
+;(defun print-hand (hand)
+;  (dolist (card hand)
+;    (format t "~a " (card-val card)))
+;  (format t "~&"))
