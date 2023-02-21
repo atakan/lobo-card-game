@@ -79,7 +79,7 @@
  Your options for command are:
    m ('match'): Take a card from your hand and the matching card from the wolf's hand. You receive the top card.
    s ('sum'): Take several of your cards from your hand to add up to one of wolf's cards. You receive the top card.
-   w ('sweep'): A single card from your hand matches the sum of several card's from the wolf's hand. The wolf receives the top card.
+   w ('sweep'): A single card from your hand matches the sum of several cards from the wolf's hand. The wolf receives the top card.
    o ('over'): A single card from your hand is greater than a single card from the wolf's hand. The wolf receives cards in number equal to difference of the two cards.
    f ('fold'): The round ends. The wolf receives points equal to sum of the cards in its hand.
 
@@ -99,12 +99,7 @@
       (game-mess g "You need to fold with two nils.")
       (progn
 	(game-mess g "You folded.")
-	(move-cards (length (y-hand g)) :from (y-hand g) :to (discard g))
-	;; XXX change this, discarding and returning should be enough XXX
-	(setf (w-score g) (+ (w-score g) (sum-hand (w-hand g)))) ; incr w's score
-	(move-cards (length (w-hand g)) :from (w-hand g) :to (discard g))
-	(if (tc-revealed g) (move-cards 1 :from (deck g) :to (discard g)))
-	(deal-new-hands g))))
+	(move-cards (length (y-hand g)) :from (y-hand g) :to (discard g)))))
 
 (defun card-val-sum (hand indices)
   "Given a hand and a list of indices, calculates and returns the sum of card values"
