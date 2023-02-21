@@ -105,115 +105,56 @@
 	(move-cards (length (w-hand g)) :from (w-hand g) :to (discard g))
 	(if (tc-revealed g) (move-cards 1 :from (deck g) :to (discard g)))
 	(deal-new-hands g))))
-    
-(defmethod match ((g lobo-game) cards)
-  (let ((y-cards (first cards))
-	(w-cards (second cards)))
-    ;; ensure that there is one index in each card list
-    ;(if (or (not (= 1 (length y-cards))) (not (= 1 (length w-cards))))
-    (unless (and (= 1 (length y-cards)) (= 1 (length w-cards)))
-      (game-mess g "for match, you need to indicate one card in each hand")
-      (return-from match))
-    ;; ensure that the cards match
-    (unless (equal (card-val (elt (y-hand g) (car y-cards)))
-		   (card-val (elt (w-hand g) (car w-cards))))
-      (game-mess g "the cards you indicate do not match")
-      (return-from match))
-    (game-mess g "you matched successfully!")
-    ;; remove the indicated cards
-    (setf (y-hand g) (remove-cards g y-cards (y-hand g)))
-    (setf (w-hand g) (remove-cards g w-cards (w-hand g)))
-    ;; deal next card to the player (this turns off top-card-revealed)
-    (move-cards 1 :from (deck g) :to (y-hand g))
-    (setf (tc-revealed g) nil)))
 
 (defun card-val-sum (hand indices)
   "Given a hand and a list of indices, calculates and returns the sum of card values"
   (loop for i in indices
 	sum (card-val (elt hand i))))
 
-;; trying some refactoring here. maybe not necessary, but all actions are pretty similar, so worth a try
+;; a macro to implement various actions, perhaps an overkill
 
-(defmacro make-action (action-name
-		       y-card-cond w-card-cond wrong-card-mess
-;		       card-val-cond wrong-val-mess
-;		       next-deal-player next-deal-cards
-		       )
+(defmacro make-action2 (action-name
+			y-card-cond w-card-cond wrong-card-mess
+			val-diff-cond wrong-val-mess
+			success-mess num-deal-cards deal-to-player)
   `(defmethod ,action-name ((g lobo-game) cards)
      (let ((y-cards (first cards))
 	   (w-cards (second cards)))
        (unless (and (,(first y-card-cond) (length y-cards) ,(second y-card-cond))
 		    (,(first w-card-cond) (length w-cards) ,(second w-card-cond)))
-	 (game-mess ,wrong-card-mess)
-	 (return-from ,action-name)))))
+	 (game-mess g ,wrong-card-mess)
+	 (return-from ,action-name))
+       (let ((val-diff (- (card-val-sum (y-hand g) y-cards)
+			  (card-val-sum (w-hand g) w-cards))))
+	 (unless (,@val-diff-cond val-diff)
+	   (game-mess g ,wrong-val-mess)
+	   (return-from ,action-name))
+	 (game-mess g ,success-mess)
+	 (setf (y-hand g) (remove-cards g y-cards (y-hand g)))
+	 (setf (w-hand g) (remove-cards g w-cards (w-hand g)))
+	 (move-cards ,num-deal-cards :from (deck g) :to (,deal-to-player g))
+	 (setf (tc-revealed g) nil)))))
 
+(make-action2 match
+	     (= 1) (= 1) "for match, you need to indicate one card in both hands"
+	     (= 0) "the cards you indicate are not equal to each other"
+	     "you matched successfully!" 1 y-hand)
 
-; (macroexpand-1 '(make-action sum
-;			  (> 1) (= 1) "for sum, you need to indicate one card in wolf's and several in yours"))
-				
+(make-action2 sum
+	      (> 1) (= 1) "for sum, you need to indicate one card in wolf's and several in yours"
+	      (= 0) "the cards you indicate do not sum up to each other"
+	      "you summed successfully!" 1 y-hand)
 
-(defmethod sum ((g lobo-game) cards)
-  (let ((y-cards (first cards))
-	(w-cards (second cards)))
-    ;; ensure that there is one index in wolf's hand and several in your hand
-    (unless (and (> (length y-cards) 1) (= (length w-cards) 1))
-      (game-mess "for sum, you need to indicate one card in wolf's and several in yours")
-      (return-from sum))
-    ;; ensure that the cards match
-    (unless (equal (card-val-sum (y-hand g) y-cards)
-		   (card-val-sum (w-hand g) w-cards))
-      (game-mess g "the cards you indicate do not sum up to each other")
-      (return-from sum))
-    (game-mess g "you summed successfully!")
-    ;; remove the indicated cards
-    (setf (y-hand g) (remove-cards g y-cards (y-hand g)))
-    (setf (w-hand g) (remove-cards g w-cards (w-hand g)))
-    ;; deal next card to the player (this turns off top-card-revealed)
-    (move-cards 1 :from (deck g) :to (y-hand g))
-    (setf (tc-revealed g) nil)))
+(make-action2 sweep
+	     (= 1) (> 1) "for sweep, you need to indicate one card in your hand and several in wolf's"
+	     (= 0) "the cards you indicate do not sum up to each other"
+	     "you swept successfully!" 1 w-hand)
 
-(defmethod sweep ((g lobo-game) cards)
-  (let ((y-cards (first cards))
-	(w-cards (second cards)))
-    ;; ensure that there is one index in your hand and several in wolf's
-    (unless (and (= (length y-cards) 1) (> (length w-cards) 1))
-      (game-mess g "for sweep, you need to indicate one card in your hand and several in wolf's")
-      (return-from sweep))
-    ;; ensure that the cards match
-    (unless (equal (card-val-sum (y-hand g) y-cards)
-		   (card-val-sum (w-hand g) w-cards))
-      (game-mess g "the cards you indicate do not sum up to each other")
-      (return-from sweep))
-    (game-mess g "you swept successfully!")
-    ;; remove the indicated cards
-    (setf (y-hand g) (remove-cards g y-cards (y-hand g)))
-    (setf (w-hand g) (remove-cards g w-cards (w-hand g)))
-    ;; deal next card to the wolf (this turns off top-card-revealed)
-    (move-cards 1 :from (deck g) :to (w-hand g))
-    (setf (tc-revealed g) nil)))
-
-(defmethod over ((g lobo-game) cards)
-  (let ((y-cards (first cards))
-	(w-cards (second cards)))
-    ;; ensure that there is one index for both your hand and wolf's
-    (unless (and (= (length y-cards) 1) (= (length w-cards) 1))
-      (game-mess g "for sweep, you need to indicate one card in both your hand and wolf's")
-      (return-from over))
-    ;; ensure that your card is larger
-    (unless (> (card-val-sum (y-hand g) y-cards)
-	       (card-val-sum (w-hand g) w-cards))
-      (game-mess g "the card for your hand is not larger than the card for wolf's")
-      (return-from over))
-    (game-mess g "you went over successfully!")
-    (let ((val-diff (- (card-val-sum (y-hand g) y-cards)
-		       (card-val-sum (w-hand g) w-cards))))
-      ;; remove the indicated cards
-      (setf (y-hand g) (remove-cards g y-cards (y-hand g)))
-      (setf (w-hand g) (remove-cards g w-cards (w-hand g)))
-      ;; deal bunch of cards to the wolf (this turns off top-card-revealed)
-      (move-cards val-diff :from (deck g) :to (w-hand g))
-      (setf (tc-revealed g) nil))))
-
+(make-action2 over
+	     (= 1) (= 1) "for over, you need to indicate one card in both hands"
+	     (< 0) "the card for your hand has to be larger than the card for wolf's"
+	     "you went over successfully!" val-diff w-hand)
+    
 (defmethod game-loop ((g lobo-game))
   (loop
     (print-status g)
@@ -307,3 +248,124 @@
 ;  (dolist (card hand)
 ;    (format t "~a " (card-val card)))
 ;  (format t "~&"))
+
+
+;(defmethod match ((g lobo-game) cards)
+;  (let ((y-cards (first cards))
+;	(w-cards (second cards)))
+;    ;; ensure that there is one index in each card list
+;    ;(if (or (not (= 1 (length y-cards))) (not (= 1 (length w-cards))))
+;    (unless (and (= 1 (length y-cards)) (= 1 (length w-cards)))
+;      (game-mess g "for match, you need to indicate one card in each hand")
+;      (return-from match))
+;    ;; ensure that the cards match
+;    (unless (equal (card-val (elt (y-hand g) (car y-cards)))
+;		   (card-val (elt (w-hand g) (car w-cards))))
+;      (game-mess g "the cards you indicate do not match")
+;      (return-from match))
+;    (game-mess g "you matched successfully!")
+;    ;; remove the indicated cards
+;    (setf (y-hand g) (remove-cards g y-cards (y-hand g)))
+;    (setf (w-hand g) (remove-cards g w-cards (w-hand g)))
+;    ;; deal next card to the player (this turns off top-card-revealed)
+;    (move-cards 1 :from (deck g) :to (y-hand g))
+;    (setf (tc-revealed g) nil)))
+
+;(defmethod sum ((g lobo-game) cards)
+;  (let ((y-cards (first cards))
+;	(w-cards (second cards)))
+;    ;; ensure that there is one index in wolf's hand and several in your hand
+;    (unless (and (> (length y-cards) 1) (= (length w-cards) 1))
+;      (game-mess "for sum, you need to indicate one card in wolf's and several in yours")
+;      (return-from sum))
+;    ;; ensure that the cards match
+;    (unless (equal (card-val-sum (y-hand g) y-cards)
+;		   (card-val-sum (w-hand g) w-cards))
+;      (game-mess g "the cards you indicate do not sum up to each other")
+;      (return-from sum))
+;    (game-mess g "you summed successfully!")
+;    ;; remove the indicated cards
+;    (setf (y-hand g) (remove-cards g y-cards (y-hand g)))
+;    (setf (w-hand g) (remove-cards g w-cards (w-hand g)))
+;    ;; deal next card to the player (this turns off top-card-revealed)
+;    (move-cards 1 :from (deck g) :to (y-hand g))
+;    (setf (tc-revealed g) nil)))
+
+;(defmethod sweep ((g lobo-game) cards)
+;  (let ((y-cards (first cards))
+;	(w-cards (second cards)))
+;    ;; ensure that there is one index in your hand and several in wolf's
+;    (unless (and (= (length y-cards) 1) (> (length w-cards) 1))
+;      (game-mess g "for sweep, you need to indicate one card in your hand and several in wolf's")
+;      (return-from sweep))
+;    ;; ensure that the cards match
+;    (unless (equal (card-val-sum (y-hand g) y-cards)
+;		   (card-val-sum (w-hand g) w-cards))
+;      (game-mess g "the cards you indicate do not sum up to each other")
+;      (return-from sweep))
+;    (game-mess g "you swept successfully!")
+;    ;; remove the indicated cards
+;    (setf (y-hand g) (remove-cards g y-cards (y-hand g)))
+;    (setf (w-hand g) (remove-cards g w-cards (w-hand g)))
+;    ;; deal next card to the wolf (this turns off top-card-revealed)
+;    (move-cards 1 :from (deck g) :to (w-hand g))
+;    (setf (tc-revealed g) nil)))
+
+;(defmethod over ((g lobo-game) cards)
+;  (let ((y-cards (first cards))
+;	(w-cards (second cards)))
+;    ;; ensure that there is one index for both your hand and wolf's
+;    (unless (and (= (length y-cards) 1) (= (length w-cards) 1))
+;      (game-mess g "for sweep, you need to indicate one card in both your hand and wolf's")
+;      (return-from over))
+;    ;; ensure that your card is larger
+;    (unless (> (card-val-sum (y-hand g) y-cards)
+;	       (card-val-sum (w-hand g) w-cards))
+;      (game-mess g "the card for your hand is not larger than the card for wolf's")
+;      (return-from over))
+;    (game-mess g "you went over successfully!")
+;    (let ((val-diff (- (card-val-sum (y-hand g) y-cards)
+;		       (card-val-sum (w-hand g) w-cards))))
+;      ;; remove the indicated cards
+;      (setf (y-hand g) (remove-cards g y-cards (y-hand g)))
+;      (setf (w-hand g) (remove-cards g w-cards (w-hand g)))
+;      ;; deal bunch of cards to the wolf (this turns off top-card-revealed)
+;      (move-cards val-diff :from (deck g) :to (w-hand g))
+;      (setf (tc-revealed g) nil))))
+
+
+;(defmacro make-action (action-name
+;		       y-card-cond w-card-cond wrong-card-mess
+;		       card-val-cond wrong-val-mess
+;		       success-mess num-deal-cards deal-to-player
+;		       )
+;  `(defmethod ,action-name ((g lobo-game) cards)
+;     (let ((y-cards (first cards))
+;	   (w-cards (second cards)))
+;       (unless (and (,(first y-card-cond) (length y-cards) ,(second y-card-cond))
+;		    (,(first w-card-cond) (length w-cards) ,(second w-card-cond)))
+;	 (game-mess g ,wrong-card-mess)
+;	 (return-from ,action-name))
+;       (unless (,card-val-cond (card-val-sum (y-hand g) y-cards)
+;			       (card-val-sum (w-hand g) w-cards))
+;	 (game-mess g ,wrong-val-mess)
+;	 (return-from ,action-name))
+;       (game-mess g ,success-mess)
+;       (setf (y-hand g) (remove-cards g y-cards (y-hand g)))
+;       (setf (w-hand g) (remove-cards g w-cards (w-hand g)))
+;       (move-cards ,num-deal-cards :from (deck g) :to (,deal-to-player g))
+;       (setf (tc-revealed g) nil))))
+;(make-action match
+;	     (= 1) (= 1) "for match, you need to indicate one card in both hands"
+;	     equal "the cards you indicate are not equal to each other"
+;	     "you matched successfully!" 1 y-hand)
+
+;(make-action sum
+;	     (> 1) (= 1) "for sum, you need to indicate one card in wolf's and several in yours"
+;	     equal "the cards you indicate do not sum up to each other"
+;	     "you summed successfully!" 1 y-hand)
+
+;(make-action sweep
+;	     (= 1) (> 1) "for sweep, you need to indicate one card in your hand and several in wolf's"
+;	     equal "the cards you indicate do not sum up to each other"
+;	     "you swept successfully!" 1 w-hand)
