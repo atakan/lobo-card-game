@@ -132,6 +132,26 @@
   (loop for i in indices
 	sum (card-val (elt hand i))))
 
+;; trying some refactoring here. maybe not necessary, but all actions are pretty similar, so worth a try
+
+(defmacro make-action (action-name
+		       y-card-cond w-card-cond wrong-card-mess
+;		       card-val-cond wrong-val-mess
+;		       next-deal-player next-deal-cards
+		       )
+  `(defmethod ,action-name ((g lobo-game) cards)
+     (let ((y-cards (first cards))
+	   (w-cards (second cards)))
+       (unless (and (,(first y-card-cond) (length y-cards) ,(second y-card-cond))
+		    (,(first w-card-cond) (length w-cards) ,(second w-card-cond)))
+	 (game-mess ,wrong-card-mess)
+	 (return-from ,action-name)))))
+
+
+; (macroexpand-1 '(make-action sum
+;			  (> 1) (= 1) "for sum, you need to indicate one card in wolf's and several in yours"))
+				
+
 (defmethod sum ((g lobo-game) cards)
   (let ((y-cards (first cards))
 	(w-cards (second cards)))
