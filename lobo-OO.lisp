@@ -168,29 +168,34 @@
 	    (t (lobo-help)))))
     ;; do game checks here;
     ;; 1. end the round if one of the hands is empty,
-    (when (equal (w-hand g) nil)
-      (game-mess g "you won the round")
-      ;; 1b. update score,
-      (incf (y-score g) (sum-hand (y-hand g)))
-      ;; 1c. discard non-empty hand(and top card if revealed) and deal new hands.
-      (move-cards (length (y-hand g)) :from (y-hand g) :to (discard g))
-      (if (tc-revealed g) (move-cards 1 :from (deck g) :to (discard g)))
-      (deal-new-hands g))
-    (when (equal (y-hand g) nil)
-      (game-mess g "wolf won the round")
-      ;; 1b. update score,
-      (incf (w-score g) (sum-hand (w-hand g)))
-      ;; 1c. discard non-empty hand(and top card if revealed) and deal new hands.
-      (move-cards (length (w-hand g)) :from (w-hand g) :to (discard g))
-      (if (tc-revealed g) (move-cards 1 :from (deck g) :to (discard g)))
-      (deal-new-hands g))
-    ;; 2. end the game if the final score is reached.
-    (if (or (> (w-score g) (max-score g))
-	    (> (y-score g) (max-score g)))
-	(return 'quit)
-      ;; 2b. shuffle discard and add to bottom of deck if not.
-	(progn
-	  (format t "shuffle etc. (TBD)")))))
+    (when (or (equal (w-hand g) nil) (equal (y-hand g) nil))
+      (if (y-hand g)
+	  (progn
+	    (game-mess g "you won the round")
+	    ;; 1b. update score,
+	    (incf (y-score g) (sum-hand (y-hand g)))
+	    ;; 1c. discard non-empty hand(and top card if revealed) and deal new hands.
+	    (move-cards (length (y-hand g)) :from (y-hand g) :to (discard g))
+	    (if (tc-revealed g) (move-cards 1 :from (deck g) :to (discard g)))
+	    (deal-new-hands g))
+	  (progn
+	    (game-mess g "wolf won the round")
+	    ;; 1b. update score,
+	    (incf (w-score g) (sum-hand (w-hand g)))
+	    ;; 1c. discard non-empty hand(and top card if revealed) and deal new hands.
+	    (move-cards (length (w-hand g)) :from (w-hand g) :to (discard g))
+	    (if (tc-revealed g) (move-cards 1 :from (deck g) :to (discard g)))
+	    (deal-new-hands g)))
+      ;; 2. end the game if the final score is reached.
+      (if (or (> (w-score g) (max-score g))
+	      (> (y-score g) (max-score g)))
+	  (return 'quit)
+	  ;; 2b. shuffle discard and add to bottom of deck if not.
+	  (progn
+	    (game-mess g "shuffling discard and moving to the bottom of deck")
+	    (shuffle (discard g))
+	    (setf (deck g) (concatenate 'list (deck g) (discard g)))
+	    (setf (discard g) nil))))))
        
 
 ;;; A utility function that can potentially be useful elsewhere
