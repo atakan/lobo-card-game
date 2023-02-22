@@ -8,7 +8,8 @@
    (top-card-revealed :initform nil :accessor tc-revealed)
    (wolf-score :initform 0 :accessor w-score)
    (your-score :initform 0 :accessor y-score)
-   (max-score :initform 100 :accessor max-score))
+   (max-score :initform 100 :initarg :max-score :accessor max-score)
+   (difficulty :initform "hard" :initarg :difficulty :accessor difficulty))
   (:documentation "This keeps track of the status of the game. The first four are card collections, the fifth is a boolean variable, next two are integers."))
 
 (defun make-lobo-deck (&key (difficulty "hard"))
@@ -64,10 +65,12 @@
   (move-cards 4 :from (deck g) :to (y-hand g))
   (move-cards 4 :from (deck g) :to (w-hand g)))
 
-(defun simple-game ()
+(defun simple-game (&key (difficulty "hard") (max-score 100))
   (let ((g (make-instance 'lobo-game
-			  :init-deck (shuffle (make-lobo-deck)))))
-    (print-status g)
+			  :init-deck (shuffle
+				      (make-lobo-deck :difficulty difficulty))
+			  :max-score max-score)))
+    (game-mess g "~&Starting new game")
     (deal-new-hands g)
     (game-loop g)))
 
@@ -85,8 +88,11 @@
 
   The round will also end if as a result of a command either hand is down to zero cards.")) 
 
-(defmethod game-mess ((g lobo-game) mess)
-  (format t mess))
+(defgeneric game-mess (lobo-game &rest args)
+  (:documentation "ho ho ho"))
+
+(defmethod game-mess ((g lobo-game) &rest args)
+  (apply #'format (cons t args)))
 
 (defun card-val (card)
   (first card))
@@ -171,7 +177,7 @@
     (when (or (equal (w-hand g) nil) (equal (y-hand g) nil))
       (if (y-hand g)
 	  (progn
-	    (game-mess g "you won the round")
+	    (game-mess g "~&You won the round")
 	    ;; 1b. update score,
 	    (incf (y-score g) (sum-hand (y-hand g)))
 	    ;; 1c. discard non-empty hand(and top card if revealed) and deal new hands.
@@ -179,7 +185,7 @@
 	    (if (tc-revealed g) (move-cards 1 :from (deck g) :to (discard g)))
 	    (deal-new-hands g))
 	  (progn
-	    (game-mess g "wolf won the round")
+	    (game-mess g "~&Wolf won the round")
 	    ;; 1b. update score,
 	    (incf (w-score g) (sum-hand (w-hand g)))
 	    ;; 1c. discard non-empty hand(and top card if revealed) and deal new hands.
@@ -189,10 +195,13 @@
       ;; 2. end the game if the final score is reached.
       (if (or (> (w-score g) (max-score g))
 	      (> (y-score g) (max-score g)))
-	  (return 'quit)
+	  (progn
+	    (game-mess g "~&Final scores -- You: ~d  Wolf: ~d"
+		       (y-score g) (w-score g))
+	    (return 'quit))
 	  ;; 2b. shuffle discard and add to bottom of deck if not.
 	  (progn
-	    (game-mess g "shuffling discard and moving to the bottom of deck")
+	    (game-mess g "~&Shuffling discard and moving to the bottom of deck")
 	    (shuffle (discard g))
 	    (setf (deck g) (concatenate 'list (deck g) (discard g)))
 	    (setf (discard g) nil))))))
