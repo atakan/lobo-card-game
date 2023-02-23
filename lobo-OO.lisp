@@ -54,7 +54,7 @@
   (format t " (~a cards left in deck," (length (deck g)))
   (format t " ~a cards in discard.)" (length (discard g))))
 
-;;; pop and push do not work as I expected, so I need to make this a macro. If I use defun, the arguments are not modified. Maybe it would work if I make it a method.
+;;; pop and push do not work as I expected, so I need to make this a macro. If I use defun, the arguments are not modified. Maybe it would work if I make it a method. This doesn't work as a function since Lisp is pass by value.
 (defmacro move-cards (n &key from to)
   `(dotimes (i ,n)
      (push (pop ,from) ,to)))
@@ -156,7 +156,20 @@
 	     (= 1) (= 1) "for over, you need to indicate one card in both hands"
 	     (< 0) "the card for your hand has to be larger than the card for wolf's"
 	     "you went over successfully!" val-diff w-hand)
-    
+
+(defmacro end-of-round (winner winner-hand winner-score)
+  `(progn
+     (game-mess g "~&~a won the round" ,winner)
+     ;; update score
+     (incf (,winner-score g) (sum-hand (,winner-hand g)))
+     ;; move non-empty hand to discard
+     (move-cards (length (,winner-hand g))
+		 :from (,winner-hand g) :to (discard g))
+     ;; burn the top card if already revealed
+     (if (tc-revealed g) (move-cards 1 :from (deck g) :to (discard g)))
+     ;; deal new hands
+     (deal-new-hands g)))
+
 (defmethod game-loop ((g lobo-game))
   (loop
     (print-status g)
@@ -177,22 +190,8 @@
     ;; 1. end the round if one of the hands is empty,
     (when (or (equal (w-hand g) nil) (equal (y-hand g) nil))
       (if (y-hand g)
-	  (progn
-	    (game-mess g "~&You won the round")
-	    ;; 1b. update score,
-	    (incf (y-score g) (sum-hand (y-hand g)))
-	    ;; 1c. discard non-empty hand(and top card if revealed) and deal new hands.
-	    (move-cards (length (y-hand g)) :from (y-hand g) :to (discard g))
-	    (if (tc-revealed g) (move-cards 1 :from (deck g) :to (discard g)))
-	    (deal-new-hands g))
-	  (progn
-	    (game-mess g "~&Wolf won the round")
-	    ;; 1b. update score,
-	    (incf (w-score g) (sum-hand (w-hand g)))
-	    ;; 1c. discard non-empty hand(and top card if revealed) and deal new hands.
-	    (move-cards (length (w-hand g)) :from (w-hand g) :to (discard g))
-	    (if (tc-revealed g) (move-cards 1 :from (deck g) :to (discard g)))
-	    (deal-new-hands g)))
+	  (end-of-round "You" y-hand y-score)
+	  (end-of-round "Wolf" w-hand w-score))
       ;; 2. end the game if the final score is reached.
       (if (or (> (w-score g) (max-score g))
 	      (> (y-score g) (max-score g)))
